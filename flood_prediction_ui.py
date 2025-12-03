@@ -11,17 +11,14 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Configuration
-# Model-specific thresholds to account for class imbalance and model-specific biases
-# Lower threshold = more sensitive to flooded predictions (reduces false negatives)
-# Higher threshold = more conservative (reduces false positives)
-# InceptionV3 performs better, so it can use a higher threshold
-# Baseline CNN and ResNet50 need lower thresholds due to stronger bias
+# Use InceptionV3 only - it's the only model that works properly
+# Baseline CNN and ResNet50 are biased due to class imbalance in training
 MODEL_THRESHOLDS = {
-    'Baseline CNN': 0.40,      # Balanced threshold - raised to reduce false positives
-    'ResNet50': 0.42,          # Balanced threshold - raised to reduce false positives
-    'InceptionV3': 0.45        # Slightly raised for better balance
+    'Baseline CNN': 0.50,      # May not work well - trained on imbalanced data
+    'ResNet50': 0.50,          # May not work well - trained on imbalanced data  
+    'InceptionV3': 0.50        # Works best - use this model's predictions
 }
-DEFAULT_THRESHOLD = 0.40  # Fallback for unknown models
+DEFAULT_THRESHOLD = 0.50
 
 # Page configuration
 st.set_page_config(
@@ -69,9 +66,9 @@ def load_models():
     """Load all trained models"""
     models = {}
     model_paths = {
-        'Baseline CNN': 'best_baseline_model.keras',
-        'ResNet50': 'best_resnet50_model.keras',
-        'InceptionV3': 'best_inceptionv3_model.keras'
+        # 'Baseline CNN': 'best_baseline_model.keras',  # Disabled - biased model
+        # 'ResNet50': 'best_resnet50_model.keras',      # Disabled - biased model
+        'InceptionV3': 'best_inceptionv3_model.keras'   # Only use InceptionV3 - it works
     }
     
     for model_name, model_path in model_paths.items():
@@ -236,14 +233,9 @@ def main():
                             # Use model-specific threshold to account for this
                             threshold = MODEL_THRESHOLDS.get(model_name, DEFAULT_THRESHOLD)
                             
-                            # Alternative approach: Check if non_flooded_prob is low enough
-                            # This is more intuitive - if model is not confident it's non-flooded, predict flooded
-                            # For biased models, we need non_flooded_prob to be quite high to trust it
-                            non_flooded_threshold = 1.0 - threshold  # Inverse threshold
-                            if non_flooded_prob < non_flooded_threshold:
-                                prediction = "Flooded"
-                            else:
-                                prediction = "Non-Flooded"
+                            # Standard prediction logic
+                            # With properly trained models (using class weights), use standard 0.5 threshold
+                            prediction = "Flooded" if flooded_prob > threshold else "Non-Flooded"
                             confidence = max(flooded_prob, non_flooded_prob)
                             
                             predictions[model_name] = {
